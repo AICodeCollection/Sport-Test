@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跑步姿态分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #0056b3;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        }
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .recommendation-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <h1 class="text-center mb-4">跑步姿态分析系统</h1>
+                
+                <!-- 上传区域 -->
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="videoInput" accept="video/*" style="display: none;">
+                    <div class="upload-content">
+                        <h4>上传跑步视频</h4>
+                        <p>支持 MP4, AVI, MOV 等格式</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('videoInput').click()">
+                            选择视频文件
+                        </button>
+                        <p class="mt-2 text-muted">或拖拽视频文件到此区域</p>
+                    </div>
+                </div>
+                
+                <!-- 加载状态 -->
+                <div class="loading-spinner" id="loadingSpinner">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">分析中...</span>
+                    </div>
+                    <p class="mt-2">正在分析您的跑步姿态，请稍候...</p>
+                </div>
+                
+                <!-- 结果展示区域 -->
+                <div id="resultsSection" style="display: none;">
+                    <h3 class="mt-4">分析结果</h3>
+                    
+                    <!-- 视频显示区域 -->
+                    <div id="videoSection" class="mb-4">
+                        <h4>上传的视频</h4>
+                        <div class="text-center">
+                            <video id="uploadedVideo" controls style="max-width: 100%; height: auto; max-height: 400px;">
+                                您的浏览器不支持视频播放。
+                            </video>
+                        </div>
+                    </div>
+                    
+                    <!-- 步态指标 -->
+                    <div class="row" id="gaitMetrics">
+                        <div class="col-md-4">
+                            <div class="metric-card text-center">
+                                <h5>步频</h5>
+                                <h3 id="cadence" class="text-primary">--</h3>
+                                <p>步/分钟</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-card text-center">
+                                <h5>步幅</h5>
+                                <h3 id="strideLength" class="text-success">--</h3>
+                                <p>相对单位</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-card text-center">
+                                <h5>总步数</h5>
+                                <h3 id="totalSteps" class="text-info">--</h3>
+                                <p>步</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 姿态分析 -->
+                    <div class="row mt-3" id="formAnalysis">
+                        <div class="col-md-6">
+                            <div class="metric-card text-center">
+                                <h5>平均膝关节角度</h5>
+                                <h3 id="kneeAngle" class="text-warning">--</h3>
+                                <p>度</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="metric-card text-center">
+                                <h5>平均身体前倾角度</h5>
+                                <h3 id="forwardLean" class="text-danger">--</h3>
+                                <p>度</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 图表展示 -->
+                    <div id="chartsSection" class="mt-4">
+                        <h4>详细分析图表</h4>
+                        <div id="chartContainer"></div>
+                    </div>
+                    
+                    <!-- 建议 -->
+                    <div class="mt-4">
+                        <h4>改进建议</h4>
+                        <div id="recommendations"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const videoInput = document.getElementById('videoInput');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultsSection = document.getElementById('resultsSection');
+
+        // 拖拽上传功能
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        // 文件选择处理
+        videoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        function handleFileUpload(file) {
+            if (!file.type.startsWith('video/')) {
+                alert('请选择视频文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            // 显示加载状态
+            loadingSpinner.style.display = 'block';
+            resultsSection.style.display = 'none';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingSpinner.style.display = 'none';
+                
+                if (data.error) {
+                    alert('分析失败: ' + data.error);
+                    return;
+                }
+
+                displayResults(data);
+            })
+            .catch(error => {
+                loadingSpinner.style.display = 'none';
+                alert('上传失败: ' + error.message);
+            });
+        }
+
+        function displayResults(data) {
+            // 显示视频
+            if (data.video_url) {
+                const videoElement = document.getElementById('uploadedVideo');
+                videoElement.src = data.video_url;
+                videoElement.style.display = 'block';
+            }
+
+            // 显示步态指标
+            document.getElementById('cadence').textContent = data.gait_metrics.cadence;
+            document.getElementById('strideLength').textContent = data.gait_metrics.stride_length;
+            document.getElementById('totalSteps').textContent = data.gait_metrics.total_steps;
+
+            // 显示姿态分析
+            document.getElementById('kneeAngle').textContent = data.form_analysis.avg_knee_angle;
+            document.getElementById('forwardLean').textContent = data.form_analysis.avg_forward_lean;
+
+            // 显示图表
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '';
+            
+            if (data.charts) {
+                Object.entries(data.charts).forEach(([chartName, chartData]) => {
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'chart-container';
+                    chartDiv.innerHTML = `<img src="data:image/png;base64,${chartData}" class="img-fluid" alt="${chartName}">`;
+                    chartContainer.appendChild(chartDiv);
+                });
+            }
+
+            // 显示建议
+            const recommendationsDiv = document.getElementById('recommendations');
+            recommendationsDiv.innerHTML = '';
+            
+            data.recommendations.forEach(recommendation => {
+                const recDiv = document.createElement('div');
+                recDiv.className = 'recommendation-item';
+                recDiv.textContent = recommendation;
+                recommendationsDiv.appendChild(recDiv);
+            });
+
+            // 显示结果区域
+            resultsSection.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

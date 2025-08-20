@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>心率频率计算测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .pass { border-color: #4CAF50; background-color: #f0f8ff; }
+        .fail { border-color: #f44336; background-color: #ffe0e0; }
+    </style>
+</head>
+<body>
+    <h1>心率频率计算测试</h1>
+    <div id="results"></div>
+    
+    <script src="js/fft.js"></script>
+    <script>
+        function testFrequencyCalculation() {
+            const results = document.getElementById('results');
+            
+            // 测试FFT频率计算
+            const sampleRate = 30; // 30 fps
+            const fftSize = 512;
+            const fft = new FFT(fftSize);
+            
+            // 创建已知频率的测试信号
+            const testFrequencies = [1.0, 1.5, 2.0, 2.5]; // Hz
+            const testBPMs = testFrequencies.map(f => f * 60); // 对应的BPM
+            
+            testFrequencies.forEach((targetFreq, index) => {
+                const real = new Array(fftSize).fill(0);
+                const imag = new Array(fftSize).fill(0);
+                
+                // 生成正弦波信号
+                for (let i = 0; i < fftSize; i++) {
+                    real[i] = Math.sin(2 * Math.PI * targetFreq * i / sampleRate);
+                }
+                
+                // 执行FFT
+                const fftResult = fft.fft(real, imag);
+                const magnitude = fft.magnitude(fftResult.real, fftResult.imag);
+                
+                // 找到最大峰值
+                let maxIndex = 0;
+                let maxValue = 0;
+                for (let i = 1; i < magnitude.length / 2; i++) {
+                    if (magnitude[i] > maxValue) {
+                        maxValue = magnitude[i];
+                        maxIndex = i;
+                    }
+                }
+                
+                // 计算检测到的频率
+                const detectedFreq = maxIndex * sampleRate / magnitude.length;
+                const detectedBPM = detectedFreq * 60;
+                
+                // 检查误差
+                const freqError = Math.abs(detectedFreq - targetFreq);
+                const bpmError = Math.abs(detectedBPM - testBPMs[index]);
+                const isPass = freqError < 0.1; // 允许0.1Hz误差
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-result ${isPass ? 'pass' : 'fail'}`;
+                resultDiv.innerHTML = `
+                    <strong>测试 ${index + 1}:</strong><br>
+                    目标频率: ${targetFreq} Hz (${testBPMs[index]} BPM)<br>
+                    检测频率: ${detectedFreq.toFixed(3)} Hz (${detectedBPM.toFixed(1)} BPM)<br>
+                    误差: ${freqError.toFixed(3)} Hz (${bpmError.toFixed(1)} BPM)<br>
+                    状态: ${isPass ? '通过' : '失败'}
+                `;
+                results.appendChild(resultDiv);
+                
+                console.log(`Test ${index + 1}: Target=${targetFreq}Hz, Detected=${detectedFreq.toFixed(3)}Hz, Error=${freqError.toFixed(3)}Hz`);
+            });
+            
+            // 测试索引计算
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-result';
+            testDiv.innerHTML = `
+                <strong>索引计算测试:</strong><br>
+                采样率: ${sampleRate} Hz<br>
+                FFT大小: ${fftSize}<br>
+                频率分辨率: ${(sampleRate / fftSize).toFixed(4)} Hz/bin<br>
+                1 Hz 对应索引: ${Math.floor(1 * fftSize / sampleRate)}<br>
+                2 Hz 对应索引: ${Math.floor(2 * fftSize / sampleRate)}<br>
+                最大可检测频率: ${sampleRate / 2} Hz
+            `;
+            results.appendChild(testDiv);
+        }
+        
+        // 页面加载完成后运行测试
+        window.onload = testFrequencyCalculation;
+    </script>
+</body>
+</html>

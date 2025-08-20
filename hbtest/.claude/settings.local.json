@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:pubmed.ncbi.nlm.nih.gov)",
+      "WebFetch(domain:www.researchgate.net)",
+      "WebFetch(domain:www.semanticscholar.org)",
+      "Bash(python3:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": []
+  }
+}
